@@ -35,7 +35,7 @@ class Asset(Base):
 
     # Core data fields
     tags: Mapped[Optional[List[str]]] = mapped_column(
-        JSONB, nullable=True, default=list, server_default="'[]'::jsonb"
+        JSONB, nullable=True, default=list, server_default="[]"
     )
     color: Mapped[Optional[str]] = mapped_column(String(8), nullable=True)
 
@@ -59,7 +59,7 @@ class Asset(Base):
     # Descriptions & Custom extensions
     remarks: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     custom_field: Mapped[Optional[Dict[str, Any]]] = mapped_column(
-        JSONB, nullable=True, default=dict, server_default="'{}'::jsonb"
+        JSONB, nullable=True, default=dict, server_default="{}"
     )
 
     # System audit trails

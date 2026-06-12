@@ -27,7 +27,7 @@ class Contact(Base):
 
     # Hybrid tag system (JSONB array)
     tags: Mapped[Optional[List[str]]] = mapped_column(
-        JSONB, nullable=True, default=list, server_default="'[]'::jsonb"
+        JSONB, nullable=True, default=list, server_default="[]"
     )
     remarks: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
