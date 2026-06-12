@@ -1,10 +1,10 @@
-from models.base import Base
+from src.models.base import Base
 
-from models.asset import Asset, AssetPriceOption, AssetConsultLog, AssetContact
-from models.complex import Complex, UnitType
-from models.contact import Contact, ContactPhone, ContactTag
-from models.agency import Agency, Agent
-from models.workspace import User, Workspace
+from src.models.asset import Asset, AssetPriceOption, AssetConsultLog, AssetContact
+from src.models.complex import Complex, UnitType
+from src.models.contact import Contact, ContactPhone, ContactTag
+from src.models.agency import Agency, Agent
+from src.models.workspace import User, Workspace
 
 
 __all__ = [
