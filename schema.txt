@@ -1,0 +1,185 @@
+Project project_name {
+  database_type: 'PostgreSQL'
+  Note: 'Asset Link DB'
+}
+
+Table predefined_complexes {
+  id uuid [primary key, unique, not null, default: `uuid_generate_v4()`]
+  // empty for now
+}
+
+Table complexes {
+  id uuid [primary key, unique, not null, default: `uuid_generate_v4()`]
+  name varchar(32) [not null]
+  address varchar(128)
+  remarks varchar
+  workspace_id uuid [not null]
+}
+
+Table unit_types {
+  id uuid [primary key, unique, not null, default: `uuid_generate_v4()`]
+  complex_id uuid [not null]
+  type_name varchar(16)
+  area_exclusive float
+  area_exclusive_pyeong float
+  area_total float
+  area_total_pyeong float
+  floor_plan varchar(128) // URL or ID of floor plan image
+  workspace_id uuid [not null]
+}
+
+Table assets {
+  id uuid [primary key, unique, not null, default: `uuid_generate_v4()`]
+  complex_id uuid
+  bld varchar(32)
+  unit varchar(32)
+  unit_type uuid
+  tags jsonb
+  color varchar(8) // hex color
+  intake_date date [default: `now()`]
+  expiration_date date
+  source_type varchar(16) [default: 'cold_source'] // agency, walk_in, cold_source
+  referring_agent uuid
+  remarks varchar
+  assigned_user uuid
+  custom_field jsonb
+  created_at timestamp [default: `now()`]
+  created_by uuid
+  modified_at timestamp [default: `now()`]
+  modified_by uuid
+  workspace_id uuid [not null]
+}
+
+Table asset_tags {
+  // Cleaned up at 2:00 am everyday
+  id uuid [primary key, unique, not null, default: `uuid_generate_v4()`]
+  tag varchar(32)
+  workspace_id uuid [not null]
+}
+
+Table asset_price_options {
+  id uuid [primary key, unique, not null, default: `uuid_generate_v4()`]
+  asset_id uuid [not null]
+  type varchar(16) [not null] // sale, jeonse, rent, rent_short
+  price integer
+  deposit integer
+  workspace_id uuid [not null]
+}
+
+Table asset_consult_log {
+  id uuid [primary key, unique, not null, default: `uuid_generate_v4()`]
+  asset_id uuid [not null]
+  timestamp timestamp [default: `now()`]
+  consult_log varchar
+  created_by uuid [not null]
+  workspace_id uuid [not null]
+}
+
+Table contacts {
+  id uuid [primary key, unique, not null, default: `uuid_generate_v4()`]
+  name varchar(64)
+  color varchar(8) // hex color
+  tags jsonb
+  remarks varchar
+  workspace_id uuid [not null]
+}
+
+Table contact_phones {
+  id uuid [primary key, unique, not null, default: `uuid_generate_v4()`]
+  contact_id uuid [not null]
+  label varchar(64)
+  phone varchar(32) [not null]
+  is_local boolean [not null, default: false]
+  is_opted_out boolean [not null, default: false]
+  opted_out_at timestamp
+  workspace_id uuid [not null]
+}
+
+Table contact_tags {
+  // Cleaned up at 2:00 am everyday
+  id uuid [primary key, unique, not null, default: `uuid_generate_v4()`]
+  tag varchar(32)
+  workspace_id uuid [not null]
+}
+
+Table asset_contacts {
+  id uuid [primary key, unique, not null, default: `uuid_generate_v4()`]
+  asset_id uuid [not null]
+  contact_id uuid [not null]
+  role varchar(16) // owner, tenant, co_owner
+  is_primary boolean [not null, default: false]
+  ownership_share integer
+  workspace_id uuid [not null]
+}
+
+Table agencies {
+  id uuid [primary key, unique, not null, default: `uuid_generate_v4()`]
+  name varchar(64) [not null]
+  remarks varchar
+  workspace_id uuid [not null]
+}
+
+Table agents {
+  id uuid [primary key, unique, not null, default: `uuid_generate_v4()`]
+  agency_id uuid [not null]
+  label varchar(64) [not null]
+  phone varchar(32) [not null]
+  remarks varchar
+  workspace_id uuid [not null]
+}
+
+Table users {
+  id uuid [primary key, unique, not null, default: `uuid_generate_v4()`]
+  workspace_id uuid [not null]
+  username varchar(128) [unique, not null] // email
+  password varchar(64) [not null] // bcrypt hash
+  name varchar(64) [not null]
+  phone varchar(32) [not null]
+}
+
+Table workspaces {
+  id uuid [primary key, unique, not null, default: `uuid_generate_v4()`]
+  owner_id uuid [unique, not null]
+  workspace_name varchar(32) [not null]
+}
+
+// Unit Types
+Ref: unit_types.complex_id > complexes.id
+
+// Assets
+Ref: assets.complex_id > complexes.id
+Ref: assets.unit_type > unit_types.id
+Ref: assets.assigned_user > users.id
+Ref: assets.created_by > users.id
+Ref: assets.modified_by > users.id
+Ref: assets.referring_agent > agents.id
+
+Ref: asset_price_options.asset_id > assets.id
+Ref: asset_contacts.asset_id > assets.id
+Ref: asset_contacts.contact_id > contacts.id
+Ref: asset_consult_log.asset_id > assets.id
+
+// Contacts
+Ref: contact_phones.contact_id > contacts.id
+
+// Agents
+Ref: agents.agency_id > agencies.id
+
+// Users
+Ref: workspaces.owner_id > users.id
+Ref: asset_consult_log.created_by > users.id
+
+// Workspaces
+Ref: complexes.workspace_id > workspaces.id
+Ref: unit_types.workspace_id > workspaces.id
+Ref: assets.workspace_id > workspaces.id
+Ref: asset_tags.workspace_id > workspaces.id
+Ref: asset_price_options.workspace_id > workspaces.id
+Ref: asset_consult_log.workspace_id > workspaces.id
+Ref: contacts.workspace_id > workspaces.id
+Ref: contact_tags.workspace_id > workspaces.id
+Ref: contact_phones.workspace_id > workspaces.id
+Ref: asset_contacts.workspace_id > workspaces.id
+Ref: agencies.workspace_id > workspaces.id
+Ref: agents.workspace_id > workspaces.id
+Ref: users.workspace_id > workspaces.id
