@@ -1,10 +1,11 @@
 import uuid
 
-from sqlalchemy import ForeignKey, String, func, Index
+from sqlalchemy import ForeignKey, String, func, Index, Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.models.base import Base
+from src.models.enums import SubscriptionPlan
 
 
 class Workspace(Base):
@@ -31,6 +32,12 @@ class Workspace(Base):
 
     # Core fields
     workspace_name: Mapped[str] = mapped_column(String(32), nullable=False)
+
+    plan: Mapped[SubscriptionPlan] = mapped_column(
+        SQLEnum(SubscriptionPlan, native_enum=False),
+        nullable=False,
+        default=SubscriptionPlan.TRIAL
+    )
 
     # Optimization
     __table_args__ = (

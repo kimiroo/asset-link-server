@@ -1,10 +1,11 @@
 import uuid
 
-from sqlalchemy import ForeignKey, String, func, Index
+from sqlalchemy import ForeignKey, String, func, Index, Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.models.base import Base
+from src.models.enums import UserRole
 
 
 class User(Base):
@@ -33,6 +34,12 @@ class User(Base):
     password: Mapped[str] = mapped_column(String(64), nullable=False) # Bcrypt hash
     name: Mapped[str] = mapped_column(String(64), nullable=False)
     phone: Mapped[str] = mapped_column(String(32), nullable=False)
+
+    role: Mapped[UserRole] = mapped_column(
+        SQLEnum(UserRole, native_enum=False),
+        nullable=False,
+        default=UserRole.EDITOR
+    )
 
     # Optimization
     __table_args__ = (
