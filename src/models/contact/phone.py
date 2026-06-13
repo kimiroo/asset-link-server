@@ -37,6 +37,7 @@ class ContactPhone(Base):
 
     # Status flags
     is_local: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    is_primary: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     is_opted_out: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     opted_out_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
