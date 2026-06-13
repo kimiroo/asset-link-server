@@ -9,6 +9,9 @@ LogLevelType = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
 class Settings(BaseSettings):
     DATABASE_URL: str = Field(default=...)
+    REDIS_HOST: str = Field(default=...)
+    REDIS_PORT: int = Field(default=...)
+
     LOG_LEVEL: LogLevelType = Field(default="INFO")
     IS_DEBUG: bool = Field(default=False)
 

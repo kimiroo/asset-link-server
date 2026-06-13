@@ -6,6 +6,14 @@
   - Description: PostgreSQL database connection URI
   - Options: Any valid connection string
 
+- **`REDIS_HOST`** (Required)
+  - Description: Hostname or IP address of the Redis server
+  - Options: Any valid hostname or IP
+
+- **`REDIS_PORT`** (Required)
+  - Description: Port number on which the Redis server is listening
+  - Options: Any valid port number
+
 - **`LOG_LEVEL`** (Optional, Default: `INFO`)
   - Description: Application logging verbosity level
   - Options: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`
