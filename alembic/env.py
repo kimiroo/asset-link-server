@@ -6,12 +6,17 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
+from alembic_utils.replaceable_entity import register_entities
 
 from src.core.config import get_settings
 from src.models import Base
+from src.models.policies import all_policies
 
 # AssetLink settings object
 settings = get_settings()
+
+# DB RLS policy
+register_entities(all_policies)
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
