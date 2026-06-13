@@ -1,8 +1,8 @@
 """init_db
 
-Revision ID: 42dc8d9b70ae
+Revision ID: 5f69bd35d027
 Revises:
-Create Date: 2026-06-13 17:16:57.261394
+Create Date: 2026-06-13 20:20:50.909418
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = '42dc8d9b70ae'
+revision: str = '5f69bd35d027'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -25,7 +25,7 @@ def upgrade() -> None:
     # Enable pg_trgm
     op.execute('CREATE EXTENSION IF NOT EXISTS "pg_trgm";')
 
-    # Create tables without foreign key constraints
+    # Create workspaces table without foreign key constraints
     op.create_table('workspaces',
     sa.Column('id', sa.UUID(), server_default=sa.text('gen_random_uuid()'), nullable=False),
     sa.Column('owner_id', sa.UUID(), nullable=False),
@@ -216,6 +216,7 @@ def upgrade() -> None:
     )
     op.create_index('ix_assets_assigned_user_id', 'assets', ['assigned_user_id'], unique=False)
     op.create_index('ix_assets_complex_bld_unit', 'assets', ['complex_id', 'bld', 'unit'], unique=False)
+    op.create_index('ix_assets_custom_field_trgm', 'assets', ['custom_field'], unique=False, postgresql_using='gin', postgresql_ops={'custom_field': 'jsonb_path_ops'})
     op.create_index('ix_assets_remarks_trgm', 'assets', ['remarks'], unique=False, postgresql_using='gin', postgresql_ops={'remarks': 'gin_trgm_ops'})
     op.create_index('ix_assets_source_type', 'assets', ['source_type'], unique=False)
     op.create_index('ix_assets_tags', 'assets', ['tags'], unique=False, postgresql_using='gin')
@@ -347,6 +348,7 @@ def downgrade() -> None:
     op.drop_index('ix_assets_tags', table_name='assets', postgresql_using='gin')
     op.drop_index('ix_assets_source_type', table_name='assets')
     op.drop_index('ix_assets_remarks_trgm', table_name='assets', postgresql_using='gin', postgresql_ops={'remarks': 'gin_trgm_ops'})
+    op.drop_index('ix_assets_custom_field_trgm', table_name='assets', postgresql_using='gin', postgresql_ops={'custom_field': 'jsonb_path_ops'})
     op.drop_index('ix_assets_complex_bld_unit', table_name='assets')
     op.drop_index('ix_assets_assigned_user_id', table_name='assets')
     op.drop_table('assets')
