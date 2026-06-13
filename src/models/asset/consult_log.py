@@ -18,12 +18,17 @@ class AssetConsultLog(Base):
         default=uuid.uuid4, server_default=func.gen_random_uuid()
     )
 
+    # Tenant isolation key
+    scope_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("scopes.id", ondelete="RESTRICT"), nullable=False
+    ) # TODO: [IMPORTANT] Add lower bound application security logic
+    workspace_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False
+    )
+
     # Foreign keys
     asset_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("assets.id", ondelete="CASCADE"), nullable=False
-    )
-    workspace_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False
     )
     created_by: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
@@ -39,7 +44,7 @@ class AssetConsultLog(Base):
 
     # Optimization
     __table_args__ = (
-        Index("ix_asset_consult_log_workspace_id", "workspace_id"),
+        Index("ix_asset_consult_log_workspace_scope_id", "workspace_id", "scope_id"),
         Index("ix_asset_consult_log_asset_id", "asset_id"),
     )
 

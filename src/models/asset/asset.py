@@ -1,7 +1,8 @@
 import datetime
 import uuid
 from typing import Any, Dict, List, Optional
-from sqlalchemy import ForeignKey, String, Date, DateTime, func, Index
+
+from sqlalchemy import ForeignKey, String, Date, DateTime, func, Index, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -19,6 +20,9 @@ class Asset(Base):
     )
 
     # Tenant isolation key
+    scope_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("scopes.id", ondelete="RESTRICT"), nullable=False
+    )
     workspace_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False
     )
@@ -83,7 +87,7 @@ class Asset(Base):
 
     # Database performance tuning
     __table_args__ = (
-        Index("ix_assets_workspace_id", "workspace_id"),
+        Index("ix_assets_workspace_scope_id", "workspace_id", "scope_id"),
         Index("ix_assets_complex_bld_unit", "complex_id", "bld", "unit"),
         Index("ix_assets_unit_type_id", "unit_type_id"),
         Index("ix_assets_assigned_user_id", "assigned_user_id"),
@@ -94,6 +98,9 @@ class Asset(Base):
             postgresql_using="gin",
             postgresql_ops={"remarks": "gin_trgm_ops"}
         ),
+
+        # Required to allow composite foreign key references from child tables (e.g., asset_contacts)
+        UniqueConstraint("id", "scope_id", "workspace_id", name="uq_assets_id_scope_workspace")
     )
 
     # ORM Relationships

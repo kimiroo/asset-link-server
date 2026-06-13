@@ -18,6 +18,9 @@ class User(Base):
     )
 
     # Tenant isolation key
+    directory_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("directories.id", ondelete="RESTRICT"), nullable=False
+    )
     workspace_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey(
@@ -43,7 +46,7 @@ class User(Base):
 
     # Optimization
     __table_args__ = (
-        Index("ix_users_workspace_id", "workspace_id"),
+        Index("ix_users_workspace_directory_id", "workspace_id", "directory_id"),
     )
 
     # ORM Relationships

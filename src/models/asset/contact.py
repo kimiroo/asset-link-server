@@ -1,7 +1,7 @@
 import uuid
 from typing import Optional
 
-from sqlalchemy import ForeignKey, Boolean, Integer, func, Index, UniqueConstraint, Enum as SQLEnum
+from sqlalchemy import ForeignKey, ForeignKeyConstraint, Boolean, Integer, func, Index, UniqueConstraint, Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -24,10 +24,9 @@ class AssetContact(Base):
         UUID(as_uuid=True), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False
     )
 
-    # Core relationship foreign keys
-    asset_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("assets.id", ondelete="CASCADE"), nullable=False
-    )
+    # Composite foreign key components (Declared without inline ForeignKeys)
+    scope_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    asset_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     contact_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("contacts.id", ondelete="CASCADE"), nullable=False
     )
@@ -41,9 +40,18 @@ class AssetContact(Base):
 
     # Optimization and constraints
     __table_args__ = (
-        Index("ix_asset_contacts_workspace_id", "workspace_id"),
+        # Enforce strict scope alignment with parent asset at the DB level
+        ForeignKeyConstraint(
+            ["asset_id", "scope_id", "workspace_id"],                 # Source columns in this table
+            ["assets.id", "assets.scope_id", "assets.workspace_id"],  # Target columns in parent (Asset) table
+            ondelete="CASCADE",                                       # Purge mapping if the parent asset is hard-deleted
+            onupdate="CASCADE"                                        # Automatically propagate scope changes from parent asset
+        ),
+
+        Index("ix_asset_contacts_workspace_scope_id", "workspace_id", "scope_id"),
         Index("ix_asset_contacts_asset_id", "asset_id"),
         Index("ix_asset_contacts_contact_id", "contact_id"),
+
         # Prevent assigning the exact same person to the exact same role on a single asset twice
         UniqueConstraint("asset_id", "contact_id", "role", name="uq_asset_contacts_asset_contact_role"),
     )

@@ -1,7 +1,8 @@
 import datetime
 import uuid
 from typing import Optional
-from sqlalchemy import ForeignKey, String, Boolean, DateTime, func, Index
+
+from sqlalchemy import ForeignKey, ForeignKeyConstraint, String, Boolean, DateTime, func, Index
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -17,12 +18,17 @@ class ContactPhone(Base):
         default=uuid.uuid4, server_default=func.gen_random_uuid()
     )
 
-    # Foreign keys
-    contact_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("contacts.id", ondelete="CASCADE"), nullable=False
+    # Tenant isolation key
+    scope_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("scopes.id", ondelete="RESTRICT"), nullable=False
     )
     workspace_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False
+    )
+
+    # Foreign keys
+    contact_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("contacts.id", ondelete="CASCADE"), nullable=False
     )
 
     # Phone details
@@ -36,9 +42,16 @@ class ContactPhone(Base):
 
     # Optimization
     __table_args__ = (
-        Index("ix_contact_phones_contact_id", "contact_id"),
-        # Composite index for lightning-fast caller ID lookup within a workspace
-        Index("ix_contact_phones_workspace_phone", "workspace_id", "phone"),
+        # Enforce strict scope alignment with parent contact
+        ForeignKeyConstraint(
+            ["contact_id", "scope_id", "workspace_id"],
+            ["contacts.id", "contacts.scope_id", "contacts.workspace_id"],
+            ondelete="CASCADE",
+            onupdate="CASCADE"
+        ),
+
+        Index("ix_contact_phones_workspace_scope_id_phone", "workspace_id", "scope_id", "phone"),
+        Index("ix_contact_phones_contact_id", "contact_id")
     )
 
     # ORM Relationships

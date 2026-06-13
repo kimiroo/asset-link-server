@@ -1,6 +1,6 @@
 import uuid
 from typing import Optional, List
-from sqlalchemy import ForeignKey, String, func, Index
+from sqlalchemy import ForeignKey, String, func, Index, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -17,6 +17,9 @@ class Contact(Base):
     )
 
     # Tenant isolation key
+    scope_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("scopes.id", ondelete="RESTRICT"), nullable=False
+    )
     workspace_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False
     )
@@ -33,9 +36,12 @@ class Contact(Base):
 
     # Optimization
     __table_args__ = (
-        Index("ix_contacts_workspace_id", "workspace_id"),
+        Index("ix_contacts_workspace_scope_id", "workspace_id", "scope_id"),
         Index("ix_contacts_name", "name"), # For quick customer search
         Index("ix_contacts_tags", "tags", postgresql_using="gin"), # High-speed contact tag filtering
+
+        # Required for composite foreign key references from child tables (e.g., contact_phones)
+        UniqueConstraint("id", "scope_id", "workspace_id", name="uq_contacts_id_scope_workspace")
     )
 
     # ORM Relationships

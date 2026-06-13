@@ -28,3 +28,8 @@ class PriceType(str, Enum):
     JEONSE = "jeonse"
     RENT = "rent"
     RENT_SHORT = "rent_short"
+
+class AccessControlType(str, Enum):
+    ADMIN = "admin"
+    WRITE = "write"
+    READ = "read"
