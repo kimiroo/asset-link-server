@@ -1,8 +1,8 @@
-"""init_db
+"""init_and_rbac_all_fixed
 
-Revision ID: 58952fad4002
+Revision ID: a5720d19044d
 Revises:
-Create Date: 2026-06-13 00:16:56.022141
+Create Date: 2026-06-13 15:14:58.164125
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = '58952fad4002'
+revision: str = 'a5720d19044d'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -31,33 +31,39 @@ def upgrade() -> None:
     sa.Column('owner_id', sa.UUID(), nullable=False),
     sa.Column('workspace_name', sa.String(length=32), nullable=False),
     sa.Column('plan', sa.Enum('TRIAL', 'STARTER', 'BUSINESS', 'ENTERPRISE', name='subscriptionplan', native_enum=False), nullable=False),
+    #sa.ForeignKeyConstraint(['owner_id'], ['users.id'], ondelete='RESTRICT', initially='DEFERRED', deferrable=True),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('owner_id')
     )
+    op.create_index('ix_workspaces_owner_id', 'workspaces', ['owner_id'], unique=False)
 
-    # Create users table with foreign key constraints normally
+    op.create_table('directories',
+    sa.Column('id', sa.UUID(), server_default=sa.text('gen_random_uuid()'), nullable=False),
+    sa.Column('workspace_id', sa.UUID(), nullable=False),
+    sa.Column('parent_id', sa.UUID(), nullable=True),
+    sa.Column('name', sa.String(length=64), nullable=False),
+    sa.ForeignKeyConstraint(['parent_id'], ['directories.id'], ondelete='RESTRICT'),
+    #sa.ForeignKeyConstraint(['workspace_id'], ['workspaces.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('workspace_id', 'parent_id', 'name', name='uq_directories_workspace_parent_name')
+    )
+    op.create_index('ix_directories_workspace_parent', 'directories', ['workspace_id', 'parent_id'], unique=False)
+
     op.create_table('users',
     sa.Column('id', sa.UUID(), server_default=sa.text('gen_random_uuid()'), nullable=False),
+    sa.Column('directory_id', sa.UUID(), nullable=False),
     sa.Column('workspace_id', sa.UUID(), nullable=False),
     sa.Column('username', sa.String(length=128), nullable=False),
     sa.Column('password', sa.String(length=64), nullable=False),
     sa.Column('name', sa.String(length=64), nullable=False),
     sa.Column('phone', sa.String(length=32), nullable=False),
     sa.Column('role', sa.Enum('OWNER', 'ADMIN', 'EDITOR', 'VIEWER', name='userrole', native_enum=False), nullable=False),
-    sa.ForeignKeyConstraint(['workspace_id'], ['workspaces.id'], ondelete='CASCADE', initially='DEFERRED', deferrable=True),
+    #sa.ForeignKeyConstraint(['directory_id'], ['directories.id'], ondelete='RESTRICT'),
+    #sa.ForeignKeyConstraint(['workspace_id'], ['workspaces.id'], ondelete='CASCADE', initially='DEFERRED', deferrable=True),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('username')
     )
-    op.create_index('ix_users_workspace_id', 'users', ['workspace_id'], unique=False)
-
-    # Add workspaces -> users forein key constraints manually
-    op.create_foreign_key(
-        'fk_workspaces_owner_id_users',
-        'workspaces', 'users',  # source table, target table
-        ['owner_id'], ['id'],   # source column, target column
-        ondelete='RESTRICT', initially='DEFERRED', deferrable=True
-    )
-    op.create_index('ix_workspaces_owner_id', 'workspaces', ['owner_id'], unique=False)
+    op.create_index('ix_users_workspace_directory_id', 'users', ['workspace_id', 'directory_id'], unique=False)
 
     op.create_table('agencies',
     sa.Column('id', sa.UUID(), server_default=sa.text('gen_random_uuid()'), nullable=False),
@@ -98,19 +104,17 @@ def upgrade() -> None:
     sa.UniqueConstraint('workspace_id', 'tag', name='uq_contact_tags_workspace_tag')
     )
     op.create_index('ix_contact_tags_workspace_id', 'contact_tags', ['workspace_id'], unique=False)
-    op.create_table('contacts',
+    op.create_table('scopes',
     sa.Column('id', sa.UUID(), server_default=sa.text('gen_random_uuid()'), nullable=False),
     sa.Column('workspace_id', sa.UUID(), nullable=False),
-    sa.Column('name', sa.String(length=64), nullable=True),
-    sa.Column('color', sa.String(length=8), nullable=True),
-    sa.Column('tags', postgresql.JSONB(astext_type=sa.Text()), server_default='[]', nullable=True),
-    sa.Column('remarks', sa.String(), nullable=True),
+    sa.Column('parent_id', sa.UUID(), nullable=True),
+    sa.Column('name', sa.String(length=64), nullable=False),
+    sa.ForeignKeyConstraint(['parent_id'], ['scopes.id'], ondelete='RESTRICT'),
     sa.ForeignKeyConstraint(['workspace_id'], ['workspaces.id'], ondelete='CASCADE'),
-    sa.PrimaryKeyConstraint('id')
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('workspace_id', 'parent_id', 'name', name='uq_scopes_workspace_parent_name')
     )
-    op.create_index('ix_contacts_name', 'contacts', ['name'], unique=False)
-    op.create_index('ix_contacts_tags', 'contacts', ['tags'], unique=False, postgresql_using='gin')
-    op.create_index('ix_contacts_workspace_id', 'contacts', ['workspace_id'], unique=False)
+    op.create_index('ix_scopes_workspace_parent', 'scopes', ['workspace_id', 'parent_id'], unique=False)
     op.create_table('agents',
     sa.Column('id', sa.UUID(), server_default=sa.text('gen_random_uuid()'), nullable=False),
     sa.Column('agency_id', sa.UUID(), nullable=False),
@@ -125,21 +129,40 @@ def upgrade() -> None:
     op.create_index('ix_agents_agency_id', 'agents', ['agency_id'], unique=False)
     op.create_index('ix_agents_workspace_id', 'agents', ['workspace_id'], unique=False)
     op.create_index('ix_agents_workspace_phone', 'agents', ['workspace_id', 'phone'], unique=False)
-    op.create_table('contact_phones',
+    op.create_table('contacts',
     sa.Column('id', sa.UUID(), server_default=sa.text('gen_random_uuid()'), nullable=False),
-    sa.Column('contact_id', sa.UUID(), nullable=False),
+    sa.Column('scope_id', sa.UUID(), nullable=False),
     sa.Column('workspace_id', sa.UUID(), nullable=False),
-    sa.Column('label', sa.String(length=64), nullable=True),
-    sa.Column('phone', sa.String(length=32), nullable=False),
-    sa.Column('is_local', sa.Boolean(), nullable=False),
-    sa.Column('is_opted_out', sa.Boolean(), nullable=False),
-    sa.Column('opted_out_at', sa.DateTime(timezone=True), nullable=True),
-    sa.ForeignKeyConstraint(['contact_id'], ['contacts.id'], ondelete='CASCADE'),
+    sa.Column('name', sa.String(length=64), nullable=True),
+    sa.Column('color', sa.String(length=8), nullable=True),
+    sa.Column('tags', postgresql.JSONB(astext_type=sa.Text()), server_default='[]', nullable=True),
+    sa.Column('remarks', sa.String(), nullable=True),
+    sa.ForeignKeyConstraint(['scope_id'], ['scopes.id'], ondelete='RESTRICT'),
     sa.ForeignKeyConstraint(['workspace_id'], ['workspaces.id'], ondelete='CASCADE'),
-    sa.PrimaryKeyConstraint('id')
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('id', 'scope_id', 'workspace_id', name='uq_contacts_id_scope_workspace')
     )
-    op.create_index('ix_contact_phones_contact_id', 'contact_phones', ['contact_id'], unique=False)
-    op.create_index('ix_contact_phones_workspace_phone', 'contact_phones', ['workspace_id', 'phone'], unique=False)
+    op.create_index('ix_contacts_name', 'contacts', ['name'], unique=False)
+    op.create_index('ix_contacts_tags', 'contacts', ['tags'], unique=False, postgresql_using='gin')
+    op.create_index('ix_contacts_workspace_scope_id', 'contacts', ['workspace_id', 'scope_id'], unique=False)
+    op.create_table('scope_access_controls',
+    sa.Column('id', sa.UUID(), server_default=sa.text('gen_random_uuid()'), nullable=False),
+    sa.Column('workspace_id', sa.UUID(), nullable=False),
+    sa.Column('scope_id', sa.UUID(), nullable=False),
+    sa.Column('user_id', sa.UUID(), nullable=True),
+    sa.Column('directory_id', sa.UUID(), nullable=True),
+    sa.Column('access_level', sa.Enum('ADMIN', 'WRITE', 'READ', name='accesscontroltype', native_enum=False), server_default='read', nullable=False),
+    sa.CheckConstraint('(user_id IS NOT NULL AND directory_id IS NULL) OR (user_id IS NULL AND directory_id IS NOT NULL)', name='chk_scope_acl_subject_exclusive'),
+    sa.ForeignKeyConstraint(['directory_id'], ['directories.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['scope_id'], ['scopes.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['workspace_id'], ['workspaces.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('scope_id', 'directory_id', name='uq_scope_acl_directory'),
+    sa.UniqueConstraint('scope_id', 'user_id', name='uq_scope_acl_user')
+    )
+    op.create_index('ix_scope_acl_lookup_directory', 'scope_access_controls', ['workspace_id', 'directory_id'], unique=False)
+    op.create_index('ix_scope_acl_lookup_user', 'scope_access_controls', ['workspace_id', 'user_id'], unique=False)
     op.create_table('unit_types',
     sa.Column('id', sa.UUID(), server_default=sa.text('gen_random_uuid()'), nullable=False),
     sa.Column('complex_id', sa.UUID(), nullable=False),
@@ -159,6 +182,7 @@ def upgrade() -> None:
     op.create_index('ix_unit_types_workspace_id', 'unit_types', ['workspace_id'], unique=False)
     op.create_table('assets',
     sa.Column('id', sa.UUID(), server_default=sa.text('gen_random_uuid()'), nullable=False),
+    sa.Column('scope_id', sa.UUID(), nullable=False),
     sa.Column('workspace_id', sa.UUID(), nullable=False),
     sa.Column('complex_id', sa.UUID(), nullable=True),
     sa.Column('bld', sa.String(length=32), nullable=True),
@@ -182,9 +206,11 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['created_by'], ['users.id'], ondelete='SET NULL'),
     sa.ForeignKeyConstraint(['modified_by'], ['users.id'], ondelete='SET NULL'),
     sa.ForeignKeyConstraint(['referring_agent_id'], ['agents.id'], ondelete='SET NULL'),
+    sa.ForeignKeyConstraint(['scope_id'], ['scopes.id'], ondelete='RESTRICT'),
     sa.ForeignKeyConstraint(['unit_type_id'], ['unit_types.id'], ondelete='SET NULL'),
     sa.ForeignKeyConstraint(['workspace_id'], ['workspaces.id'], ondelete='CASCADE'),
-    sa.PrimaryKeyConstraint('id')
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('id', 'scope_id', 'workspace_id', name='uq_assets_id_scope_workspace')
     )
     op.create_index('ix_assets_assigned_user_id', 'assets', ['assigned_user_id'], unique=False)
     op.create_index('ix_assets_complex_bld_unit', 'assets', ['complex_id', 'bld', 'unit'], unique=False)
@@ -192,30 +218,51 @@ def upgrade() -> None:
     op.create_index('ix_assets_source_type', 'assets', ['source_type'], unique=False)
     op.create_index('ix_assets_tags', 'assets', ['tags'], unique=False, postgresql_using='gin')
     op.create_index('ix_assets_unit_type_id', 'assets', ['unit_type_id'], unique=False)
-    op.create_index('ix_assets_workspace_id', 'assets', ['workspace_id'], unique=False)
+    op.create_index('ix_assets_workspace_scope_id', 'assets', ['workspace_id', 'scope_id'], unique=False)
+    op.create_table('contact_phones',
+    sa.Column('id', sa.UUID(), server_default=sa.text('gen_random_uuid()'), nullable=False),
+    sa.Column('scope_id', sa.UUID(), nullable=False),
+    sa.Column('workspace_id', sa.UUID(), nullable=False),
+    sa.Column('contact_id', sa.UUID(), nullable=False),
+    sa.Column('label', sa.String(length=64), nullable=True),
+    sa.Column('phone', sa.String(length=32), nullable=False),
+    sa.Column('is_local', sa.Boolean(), nullable=False),
+    sa.Column('is_opted_out', sa.Boolean(), nullable=False),
+    sa.Column('opted_out_at', sa.DateTime(timezone=True), nullable=True),
+    sa.ForeignKeyConstraint(['contact_id', 'scope_id', 'workspace_id'], ['contacts.id', 'contacts.scope_id', 'contacts.workspace_id'], onupdate='CASCADE', ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['contact_id'], ['contacts.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['scope_id'], ['scopes.id'], ondelete='RESTRICT'),
+    sa.ForeignKeyConstraint(['workspace_id'], ['workspaces.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index('ix_contact_phones_contact_id', 'contact_phones', ['contact_id'], unique=False)
+    op.create_index('ix_contact_phones_workspace_scope_id_phone', 'contact_phones', ['workspace_id', 'scope_id', 'phone'], unique=False)
     op.create_table('asset_consult_log',
     sa.Column('id', sa.UUID(), server_default=sa.text('gen_random_uuid()'), nullable=False),
-    sa.Column('asset_id', sa.UUID(), nullable=False),
+    sa.Column('scope_id', sa.UUID(), nullable=False),
     sa.Column('workspace_id', sa.UUID(), nullable=False),
+    sa.Column('asset_id', sa.UUID(), nullable=False),
     sa.Column('created_by', sa.UUID(), nullable=False),
     sa.Column('timestamp', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('consult_log', sa.String(), nullable=True),
     sa.ForeignKeyConstraint(['asset_id'], ['assets.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['created_by'], ['users.id'], ondelete='RESTRICT'),
+    sa.ForeignKeyConstraint(['scope_id'], ['scopes.id'], ondelete='RESTRICT'),
     sa.ForeignKeyConstraint(['workspace_id'], ['workspaces.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index('ix_asset_consult_log_asset_id', 'asset_consult_log', ['asset_id'], unique=False)
-    op.create_index('ix_asset_consult_log_workspace_id', 'asset_consult_log', ['workspace_id'], unique=False)
+    op.create_index('ix_asset_consult_log_workspace_scope_id', 'asset_consult_log', ['workspace_id', 'scope_id'], unique=False)
     op.create_table('asset_contacts',
     sa.Column('id', sa.UUID(), server_default=sa.text('gen_random_uuid()'), nullable=False),
     sa.Column('workspace_id', sa.UUID(), nullable=False),
+    sa.Column('scope_id', sa.UUID(), nullable=False),
     sa.Column('asset_id', sa.UUID(), nullable=False),
     sa.Column('contact_id', sa.UUID(), nullable=False),
     sa.Column('role', sa.Enum('OWNER', 'TENANT', 'CO_OWNER', name='contactrole', native_enum=False), nullable=True),
     sa.Column('is_primary', sa.Boolean(), nullable=False),
     sa.Column('ownership_share', sa.Integer(), nullable=True),
-    sa.ForeignKeyConstraint(['asset_id'], ['assets.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['asset_id', 'scope_id', 'workspace_id'], ['assets.id', 'assets.scope_id', 'assets.workspace_id'], onupdate='CASCADE', ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['contact_id'], ['contacts.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['workspace_id'], ['workspaces.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id'),
@@ -223,38 +270,76 @@ def upgrade() -> None:
     )
     op.create_index('ix_asset_contacts_asset_id', 'asset_contacts', ['asset_id'], unique=False)
     op.create_index('ix_asset_contacts_contact_id', 'asset_contacts', ['contact_id'], unique=False)
-    op.create_index('ix_asset_contacts_workspace_id', 'asset_contacts', ['workspace_id'], unique=False)
+    op.create_index('ix_asset_contacts_workspace_scope_id', 'asset_contacts', ['workspace_id', 'scope_id'], unique=False)
     op.create_table('asset_price_options',
     sa.Column('id', sa.UUID(), server_default=sa.text('gen_random_uuid()'), nullable=False),
-    sa.Column('asset_id', sa.UUID(), nullable=False),
+    sa.Column('scope_id', sa.UUID(), nullable=False),
     sa.Column('workspace_id', sa.UUID(), nullable=False),
+    sa.Column('asset_id', sa.UUID(), nullable=False),
     sa.Column('type', sa.Enum('SALE', 'JEONSE', 'RENT', 'RENT_SHORT', name='pricetype', native_enum=False), nullable=False),
     sa.Column('price', sa.Integer(), nullable=True),
     sa.Column('deposit', sa.Integer(), nullable=True),
-    sa.ForeignKeyConstraint(['asset_id'], ['assets.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['asset_id', 'scope_id', 'workspace_id'], ['assets.id', 'assets.scope_id', 'assets.workspace_id'], onupdate='CASCADE', ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['workspace_id'], ['workspaces.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('asset_id', 'type', name='uq_asset_price_options_asset_type')
     )
     op.create_index('ix_asset_price_options_asset_id', 'asset_price_options', ['asset_id'], unique=False)
-    op.create_index('ix_asset_price_options_workspace_id', 'asset_price_options', ['workspace_id'], unique=False)
+    op.create_index('ix_asset_price_options_workspace_scope_id', 'asset_price_options', ['workspace_id', 'scope_id'], unique=False)
+
+    # Add forein key constraints manually
+    # directories -> workspaces
+    op.create_foreign_key(
+        'fk_directories_workspace_id', 'directories', 'workspaces',
+        ['workspace_id'], ['id'], ondelete='CASCADE'
+    )
+
+    # users -> directories
+    op.create_foreign_key(
+        'fk_users_directory_id', 'users', 'directories',
+        ['directory_id'], ['id'], ondelete='RESTRICT'
+    )
+
+    # users -> workspaces
+    op.create_foreign_key(
+        'fk_users_workspace_id', 'users', 'workspaces',
+        ['workspace_id'], ['id'], ondelete='CASCADE',
+        deferrable=True, initially='DEFERRED'
+    )
+
+    # workspaces -> users
+    op.create_foreign_key(
+        'fk_workspaces_owner_id', 'workspaces', 'users',
+        ['owner_id'], ['id'], ondelete='RESTRICT',
+        deferrable=True, initially='DEFERRED'
+    )
     # ### end Alembic commands ###
 
 
 def downgrade() -> None:
     """Downgrade schema."""
     # ### commands auto generated by Alembic - please adjust! ###
-    op.drop_index('ix_asset_price_options_workspace_id', table_name='asset_price_options')
+
+    # Drop foreign key constraints
+    op.drop_constraint('fk_workspaces_owner_id', 'workspaces', type_='foreignkey')
+    op.drop_constraint('fk_users_workspace_id', 'users', type_='foreignkey')
+    op.drop_constraint('fk_users_directory_id', 'users', type_='foreignkey')
+    op.drop_constraint('fk_directories_workspace_id', 'directories', type_='foreignkey')
+
+    op.drop_index('ix_asset_price_options_workspace_scope_id', table_name='asset_price_options')
     op.drop_index('ix_asset_price_options_asset_id', table_name='asset_price_options')
     op.drop_table('asset_price_options')
-    op.drop_index('ix_asset_contacts_workspace_id', table_name='asset_contacts')
+    op.drop_index('ix_asset_contacts_workspace_scope_id', table_name='asset_contacts')
     op.drop_index('ix_asset_contacts_contact_id', table_name='asset_contacts')
     op.drop_index('ix_asset_contacts_asset_id', table_name='asset_contacts')
     op.drop_table('asset_contacts')
-    op.drop_index('ix_asset_consult_log_workspace_id', table_name='asset_consult_log')
+    op.drop_index('ix_asset_consult_log_workspace_scope_id', table_name='asset_consult_log')
     op.drop_index('ix_asset_consult_log_asset_id', table_name='asset_consult_log')
     op.drop_table('asset_consult_log')
-    op.drop_index('ix_assets_workspace_id', table_name='assets')
+    op.drop_index('ix_contact_phones_workspace_scope_id_phone', table_name='contact_phones')
+    op.drop_index('ix_contact_phones_contact_id', table_name='contact_phones')
+    op.drop_table('contact_phones')
+    op.drop_index('ix_assets_workspace_scope_id', table_name='assets')
     op.drop_index('ix_assets_unit_type_id', table_name='assets')
     op.drop_index('ix_assets_tags', table_name='assets', postgresql_using='gin')
     op.drop_index('ix_assets_source_type', table_name='assets')
@@ -265,17 +350,19 @@ def downgrade() -> None:
     op.drop_index('ix_unit_types_workspace_id', table_name='unit_types')
     op.drop_index('ix_unit_types_complex_id', table_name='unit_types')
     op.drop_table('unit_types')
-    op.drop_index('ix_contact_phones_workspace_phone', table_name='contact_phones')
-    op.drop_index('ix_contact_phones_contact_id', table_name='contact_phones')
-    op.drop_table('contact_phones')
+    op.drop_index('ix_scope_acl_lookup_user', table_name='scope_access_controls')
+    op.drop_index('ix_scope_acl_lookup_directory', table_name='scope_access_controls')
+    op.drop_table('scope_access_controls')
+    op.drop_index('ix_contacts_workspace_scope_id', table_name='contacts')
+    op.drop_index('ix_contacts_tags', table_name='contacts', postgresql_using='gin')
+    op.drop_index('ix_contacts_name', table_name='contacts')
+    op.drop_table('contacts')
     op.drop_index('ix_agents_workspace_phone', table_name='agents')
     op.drop_index('ix_agents_workspace_id', table_name='agents')
     op.drop_index('ix_agents_agency_id', table_name='agents')
     op.drop_table('agents')
-    op.drop_index('ix_contacts_workspace_id', table_name='contacts')
-    op.drop_index('ix_contacts_tags', table_name='contacts', postgresql_using='gin')
-    op.drop_index('ix_contacts_name', table_name='contacts')
-    op.drop_table('contacts')
+    op.drop_index('ix_scopes_workspace_parent', table_name='scopes')
+    op.drop_table('scopes')
     op.drop_index('ix_contact_tags_workspace_id', table_name='contact_tags')
     op.drop_table('contact_tags')
     op.drop_index('ix_complexes_workspace_id', table_name='complexes')
@@ -284,15 +371,12 @@ def downgrade() -> None:
     op.drop_table('asset_tags')
     op.drop_index('ix_agencies_workspace_id', table_name='agencies')
     op.drop_table('agencies')
-
-    # Drop foreign key constraints
-    op.drop_constraint('fk_workspaces_owner_id_users', 'workspaces', type_='foreignkey')
-
-    # Drop tables
     op.drop_index('ix_workspaces_owner_id', table_name='workspaces')
     op.drop_table('workspaces')
-    op.drop_index('ix_users_workspace_id', table_name='users')
+    op.drop_index('ix_users_workspace_directory_id', table_name='users')
     op.drop_table('users')
+    op.drop_index('ix_directories_workspace_parent', table_name='directories')
+    op.drop_table('directories')
 
     # Disable pg_trgm
     op.execute('DROP EXTENSION IF EXISTS "pg_trgm";')
