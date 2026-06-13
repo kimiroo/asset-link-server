@@ -17,11 +17,11 @@ class Agent(Base):
     )
 
     # Foreign keys
-    agency_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("agencies.id", ondelete="CASCADE"), nullable=False
-    )
     workspace_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False
+    )
+    agency_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("agencies.id", ondelete="CASCADE"), nullable=False
     )
 
     # Agent details

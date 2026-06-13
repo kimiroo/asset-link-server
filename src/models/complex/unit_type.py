@@ -18,11 +18,11 @@ class UnitType(Base):
     )
 
     # Foreign keys
-    complex_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("complexes.id", ondelete="CASCADE"), nullable=False
-    )
     workspace_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False
+    )
+    complex_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("complexes.id", ondelete="CASCADE"), nullable=False
     )
 
     # Metadata fields

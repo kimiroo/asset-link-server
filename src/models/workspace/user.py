@@ -18,9 +18,6 @@ class User(Base):
     )
 
     # Tenant isolation key
-    directory_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("directories.id", ondelete="RESTRICT"), nullable=False
-    )
     workspace_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey(
@@ -30,6 +27,9 @@ class User(Base):
             initially="DEFERRED"  # Delays the check automatically until the final commit
         ),
         nullable=False
+    )
+    directory_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("directories.id", ondelete="RESTRICT"), nullable=False
     )
 
     # Credentials & Metadata
