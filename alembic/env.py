@@ -46,6 +46,9 @@ def include_object(
 ) -> bool:
     """Alembic autogenerate filter to prevent dropping required PG extensions."""
 
+    if "Grant" in obj.__class__.__name__:
+        return False
+
     # 1. Exclude all objects containing 'pg_trgm' to prevent conflicts with alembic_utils
     if name and "pg_trgm" in name:
         return False
