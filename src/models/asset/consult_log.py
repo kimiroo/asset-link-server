@@ -2,7 +2,7 @@ import datetime
 import uuid
 from typing import Optional
 
-from sqlalchemy import ForeignKey, String, DateTime, func, Index
+from sqlalchemy import ForeignKey, ForeignKeyConstraint, String, DateTime, func, Index
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -27,9 +27,7 @@ class AssetConsultLog(Base):
     )
 
     # Foreign keys
-    asset_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("assets.id", ondelete="CASCADE"), nullable=False
-    )
+    asset_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     created_by: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
     )
@@ -44,6 +42,13 @@ class AssetConsultLog(Base):
 
     # Optimization
     __table_args__ = (
+        # Ensure log belongs to the same workspace as the asset, even if scope is different
+        ForeignKeyConstraint(
+            ["asset_id", "workspace_id"],
+            ["assets.id", "assets.workspace_id"],
+            ondelete="CASCADE"
+        ),
+
         Index("ix_asset_consult_log_workspace_scope_id", "workspace_id", "scope_id"),
         Index("ix_asset_consult_log_asset_id", "asset_id"),
     )

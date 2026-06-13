@@ -111,5 +111,8 @@ class Asset(Base):
     assigned_user = relationship("User", foreign_keys=[assigned_user_id], back_populates="assigned_assets")
 
     price_options = relationship("AssetPriceOption", back_populates="asset", cascade="all, delete-orphan")
-    consult_logs = relationship("AssetConsultLog", back_populates="asset", cascade="all, delete-orphan")
-    asset_contacts = relationship("AssetContact", back_populates="asset", cascade="all, delete-orphan")
+
+    # These contain sensitive info managed by App-level security.
+    # Force explicit querying to prevent accidental exposure via joinedload.
+    consult_logs = relationship("AssetConsultLog", back_populates="asset", cascade="all, delete-orphan", lazy="raise")
+    asset_contacts = relationship("AssetContact", back_populates="asset", cascade="all, delete-orphan", lazy="raise")

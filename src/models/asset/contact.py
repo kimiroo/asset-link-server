@@ -27,9 +27,7 @@ class AssetContact(Base):
     # Composite foreign key components (Declared without inline ForeignKeys)
     scope_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     asset_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
-    contact_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("contacts.id", ondelete="CASCADE"), nullable=False
-    )
+    contact_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
 
     # Relationship payload fields
     role: Mapped[Optional[ContactRole]] = mapped_column(
@@ -46,6 +44,13 @@ class AssetContact(Base):
             ["assets.id", "assets.scope_id", "assets.workspace_id"],  # Target columns in parent (Asset) table
             ondelete="CASCADE",                                       # Purge mapping if the parent asset is hard-deleted
             onupdate="CASCADE"                                        # Automatically propagate scope changes from parent asset
+        ),
+
+        # Ensure the linked contact belongs to the same workspace to prevent cross-tenant mapping
+        ForeignKeyConstraint(
+            ["contact_id", "workspace_id"],
+            ["contacts.id", "contacts.workspace_id"],
+            ondelete="CASCADE"
         ),
 
         Index("ix_asset_contacts_workspace_scope_id", "workspace_id", "scope_id"),
