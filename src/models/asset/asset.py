@@ -98,6 +98,11 @@ class Asset(Base):
             postgresql_using="gin",
             postgresql_ops={"remarks": "gin_trgm_ops"}
         ),
+        Index(
+            "ix_assets_custom_field_trgm", "custom_field",
+            postgresql_using="gin",
+            postgresql_ops={"custom_field": "jsonb_path_ops"}
+        ),
 
         # Required to allow composite foreign key references from child tables (e.g., asset_contacts)
         UniqueConstraint("id", "workspace_id", name="uq_assets_id_workspace"),
