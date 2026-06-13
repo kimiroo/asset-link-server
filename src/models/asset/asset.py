@@ -100,6 +100,7 @@ class Asset(Base):
         ),
 
         # Required to allow composite foreign key references from child tables (e.g., asset_contacts)
+        UniqueConstraint("id", "workspace_id", name="uq_assets_id_workspace"),
         UniqueConstraint("id", "scope_id", "workspace_id", name="uq_assets_id_scope_workspace")
     )
 

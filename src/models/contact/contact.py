@@ -41,6 +41,7 @@ class Contact(Base):
         Index("ix_contacts_tags", "tags", postgresql_using="gin"), # High-speed contact tag filtering
 
         # Required for composite foreign key references from child tables (e.g., contact_phones)
+        UniqueConstraint("id", "workspace_id", name="uq_contacts_id_workspace"),
         UniqueConstraint("id", "scope_id", "workspace_id", name="uq_contacts_id_scope_workspace")
     )
 
