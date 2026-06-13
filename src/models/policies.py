@@ -21,4 +21,4 @@ contacts_policy = PGPolicy(
     """
 )
 
-all_policies = [assets_policy, contacts_policy]
+all_policies = [] #[assets_policy, contacts_policy]
