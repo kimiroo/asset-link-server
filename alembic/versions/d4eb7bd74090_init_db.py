@@ -1,8 +1,8 @@
 """init_db
 
-Revision ID: deb2cf40f812
+Revision ID: d4eb7bd74090
 Revises:
-Create Date: 2026-06-13 22:33:35.265138
+Create Date: 2026-06-14 15:48:20.779880
 
 """
 from typing import Sequence, Union
@@ -11,11 +11,25 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
+
 # revision identifiers, used by Alembic.
-revision: str = 'deb2cf40f812'
+revision: str = 'd4eb7bd74090'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
+
+
+# RLS target tables
+rls_tables = [
+    'agencies', 'agents',
+    'assets', 'asset_consult_log', 'asset_contacts', 'asset_price_options', 'asset_tags',
+    'audit_logs',
+    'complexes', 'unit_types',
+    'contacts', 'contact_phones', 'contact_tags',
+    'custom_field_definitions', 'custom_field_scopes',
+    'directories',
+    'scopes', 'scope_access_controls'
+]
 
 
 def upgrade() -> None:
@@ -84,6 +98,24 @@ def upgrade() -> None:
     sa.UniqueConstraint('workspace_id', 'tag', name='uq_asset_tags_workspace_tag')
     )
     op.create_index('ix_asset_tags_workspace_id', 'asset_tags', ['workspace_id'], unique=False)
+    op.create_table('audit_logs',
+    sa.Column('id', sa.UUID(), server_default=sa.text('gen_random_uuid()'), nullable=False),
+    sa.Column('workspace_id', sa.UUID(), nullable=False),
+    sa.Column('timestamp', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('user_id', sa.UUID(), nullable=False),
+    sa.Column('action', sa.Enum('CREATE', 'UPDATE', 'DELETE', 'READ', name='auditactiontype', native_enum=False), nullable=False),
+    sa.Column('target_table', sa.Enum('AGENCY', 'AGENT', 'ASSET', 'ASSET_PRICE_OPTION', 'ASSET_CONSULT_LOG', 'ASSET_CONTACT', 'AUDIT_LOG', 'COMPLEX', 'UNIT_TYPE', 'CONTACT', 'CONTACT_PHONE', 'CONTACT_TAG', 'CUSTOM_FIELD_DEFINITION', 'CUSTOM_FIELD_SCOPE', 'DIRECTORY', 'SCOPE_ACCESS_CONTROL', 'SCOPE', 'USER', 'WORKSPACE', name='audittablename', native_enum=False), nullable=False),
+    sa.Column('target_id', sa.UUID(), nullable=False),
+    sa.Column('before_data', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+    sa.Column('after_data', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+    sa.Column('client_ip', sa.String(), nullable=True),
+    sa.ForeignKeyConstraint(['workspace_id'], ['workspaces.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_audit_logs_user_id'), 'audit_logs', ['user_id'], unique=False)
+    op.create_index('ix_audit_logs_workspace_id', 'audit_logs', ['workspace_id'], unique=False)
+    op.create_index('ix_audit_logs_workspace_target', 'audit_logs', ['workspace_id', 'user_id', 'action', 'target_table', 'target_id'], unique=False)
+    op.create_index('ix_audit_logs_workspace_timestamp', 'audit_logs', ['workspace_id', sa.literal_column('timestamp DESC')], unique=False)
     op.create_table('complexes',
     sa.Column('id', sa.UUID(), server_default=sa.text('gen_random_uuid()'), nullable=False),
     sa.Column('workspace_id', sa.UUID(), nullable=False),
@@ -104,6 +136,19 @@ def upgrade() -> None:
     sa.UniqueConstraint('workspace_id', 'tag', name='uq_contact_tags_workspace_tag')
     )
     op.create_index('ix_contact_tags_workspace_id', 'contact_tags', ['workspace_id'], unique=False)
+    op.create_table('custom_field_definitions',
+    sa.Column('id', sa.UUID(), server_default=sa.text('gen_random_uuid()'), nullable=False),
+    sa.Column('workspace_id', sa.UUID(), nullable=False),
+    sa.Column('name', sa.String(length=64), nullable=False),
+    sa.Column('field_type', sa.Enum('STRING', 'SELECT', 'INT', 'FLOAT', 'BOOLEAN', 'DATE', name='customfieldtype', native_enum=False), nullable=False),
+    sa.Column('options', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+    sa.Column('remarks', sa.String(), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('is_deleted', sa.Boolean(), nullable=False),
+    sa.ForeignKeyConstraint(['workspace_id'], ['workspaces.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index('ix_custom_field_definitions_workspace_id', 'custom_field_definitions', ['workspace_id'], unique=False)
     op.create_table('scopes',
     sa.Column('id', sa.UUID(), server_default=sa.text('gen_random_uuid()'), nullable=False),
     sa.Column('workspace_id', sa.UUID(), nullable=False),
@@ -146,6 +191,18 @@ def upgrade() -> None:
     op.create_index('ix_contacts_name', 'contacts', ['name'], unique=False)
     op.create_index('ix_contacts_tags', 'contacts', ['tags'], unique=False, postgresql_using='gin')
     op.create_index('ix_contacts_workspace_scope_id', 'contacts', ['workspace_id', 'scope_id'], unique=False)
+    op.create_table('custom_field_scopes',
+    sa.Column('id', sa.UUID(), server_default=sa.text('gen_random_uuid()'), nullable=False),
+    sa.Column('workspace_id', sa.UUID(), nullable=False),
+    sa.Column('scope_id', sa.UUID(), nullable=False),
+    sa.Column('custom_field_definition_id', sa.UUID(), nullable=False),
+    sa.ForeignKeyConstraint(['custom_field_definition_id'], ['custom_field_definitions.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['scope_id'], ['scopes.id'], ondelete='RESTRICT'),
+    sa.ForeignKeyConstraint(['workspace_id'], ['workspaces.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('workspace_id', 'scope_id', 'custom_field_definition_id', name='uq_custom_field_scopes_workspace_scope_id_cfd')
+    )
+    op.create_index('ix_custom_field_scopes_workspace_scope_id_cfd', 'custom_field_scopes', ['workspace_id', 'scope_id', 'custom_field_definition_id'], unique=False)
     op.create_table('scope_access_controls',
     sa.Column('id', sa.UUID(), server_default=sa.text('gen_random_uuid()'), nullable=False),
     sa.Column('workspace_id', sa.UUID(), nullable=False),
@@ -318,12 +375,58 @@ def upgrade() -> None:
         deferrable=True, initially='DEFERRED'
     )
 
+    # Apply RLS
+
+    # 1. Enable RLS and apply tenant isolation policies to standard core tables
+    for table in rls_tables:
+        op.execute(sa.text(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY;"))
+        op.execute(sa.text(f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY;"))
+        op.execute(sa.text(f"""
+            CREATE POLICY {table}_isolation_policy ON {table}
+            USING (workspace_id = NULLIF(current_setting('app.current_workspace_id', true), '')::uuid);
+        """))
+
+    # 2. Apply special RLS for users and workspaces tables
+
+    # users
+    op.execute(sa.text("ALTER TABLE users ENABLE ROW LEVEL SECURITY;"))
+    op.execute(sa.text("ALTER TABLE users FORCE ROW LEVEL SECURITY;"))
+    op.execute(sa.text("""
+        CREATE POLICY users_isolation_policy ON users
+        USING (
+            -- 1. Post-login: Restrict access to the user's specific workspace
+            workspace_id = NULLIF(current_setting('app.current_workspace_id', true), '')::uuid
+            OR
+            -- 2. Pre-login: Allow full access for user/email verification when session context is empty
+            NULLIF(current_setting('app.current_workspace_id', true), '') IS NULL
+        );
+    """))
+
+    # workspaces
+    op.execute(sa.text("ALTER TABLE workspaces ENABLE ROW LEVEL SECURITY;"))
+    op.execute(sa.text("ALTER TABLE workspaces FORCE ROW LEVEL SECURITY;"))
+    op.execute(sa.text("""
+        CREATE POLICY workspaces_isolation_policy ON workspaces
+        USING (
+            -- 1. Post-login: Restrict access to the specific workspace itself
+            id = NULLIF(current_setting('app.current_workspace_id', true), '')::uuid
+            OR
+            -- 2. Pre-login: Allow initial lookup for domain or workspace verification when session context is empty
+            NULLIF(current_setting('app.current_workspace_id', true), '') IS NULL
+        );
+    """))
+
     # ### end Alembic commands ###
 
 
 def downgrade() -> None:
     """Downgrade schema."""
     # ### commands auto generated by Alembic - please adjust! ###
+
+    # Drop RLS
+    for table in rls_tables:
+        op.execute(sa.text(f"DROP POLICY IF EXISTS {table}_isolation_policy ON {table};"))
+        op.execute(sa.text(f"ALTER TABLE {table} DISABLE ROW LEVEL SECURITY;"))
 
     # Drop foreign key constraints
     op.drop_constraint('fk_workspaces_owner_id', 'workspaces', type_='foreignkey')
@@ -359,6 +462,8 @@ def downgrade() -> None:
     op.drop_index('ix_scope_acl_lookup_user', table_name='scope_access_controls')
     op.drop_index('ix_scope_acl_lookup_directory', table_name='scope_access_controls')
     op.drop_table('scope_access_controls')
+    op.drop_index('ix_custom_field_scopes_workspace_scope_id_cfd', table_name='custom_field_scopes')
+    op.drop_table('custom_field_scopes')
     op.drop_index('ix_contacts_workspace_scope_id', table_name='contacts')
     op.drop_index('ix_contacts_tags', table_name='contacts', postgresql_using='gin')
     op.drop_index('ix_contacts_name', table_name='contacts')
@@ -369,10 +474,17 @@ def downgrade() -> None:
     op.drop_table('agents')
     op.drop_index('ix_scopes_workspace_parent', table_name='scopes')
     op.drop_table('scopes')
+    op.drop_index('ix_custom_field_definitions_workspace_id', table_name='custom_field_definitions')
+    op.drop_table('custom_field_definitions')
     op.drop_index('ix_contact_tags_workspace_id', table_name='contact_tags')
     op.drop_table('contact_tags')
     op.drop_index('ix_complexes_workspace_id', table_name='complexes')
     op.drop_table('complexes')
+    op.drop_index('ix_audit_logs_workspace_timestamp', table_name='audit_logs')
+    op.drop_index('ix_audit_logs_workspace_target', table_name='audit_logs')
+    op.drop_index('ix_audit_logs_workspace_id', table_name='audit_logs')
+    op.drop_index(op.f('ix_audit_logs_user_id'), table_name='audit_logs')
+    op.drop_table('audit_logs')
     op.drop_index('ix_asset_tags_workspace_id', table_name='asset_tags')
     op.drop_table('asset_tags')
     op.drop_index('ix_agencies_workspace_id', table_name='agencies')
