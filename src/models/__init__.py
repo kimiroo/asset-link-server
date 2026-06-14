@@ -8,6 +8,9 @@ from src.models.directory import Directory
 from src.models.scope import ScopeAccessControl, Scope
 from src.models.workspace import User, Workspace
 
+# RLS Policy
+from src.models import policies as policies
+
 
 __all__ = [
     "Base",
