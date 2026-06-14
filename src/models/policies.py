@@ -16,8 +16,13 @@ from sqlalchemy.sql.expression import ColumnElement
 from src.db.extensions import EnableRLS, CreatePolicy
 from src.models.agency import Agency, Agent
 from src.models.asset import Asset, AssetPriceOption, AssetConsultLog, AssetContact
+from src.models.audit import AuditLog
 from src.models.complex import Complex, UnitType
 from src.models.contact import Contact, ContactPhone, ContactTag
+from src.models.custom_field import CustomFieldDefinition, CustomFieldScope
+from src.models.directory import Directory
+from src.models.scope import ScopeAccessControl, Scope
+from src.models.workspace import User
 
 
 # ==============================================================================
@@ -89,6 +94,11 @@ def setup_asset_contact_rls(target: Table, connection: Connection, **kw: Any) ->
     """Apply RLS and isolation policy to the 'asset_contacts' table immediately after creation."""
     apply_workspace_rls(target, connection, "asset_contact_isolation_policy")
 
+@event.listens_for(AuditLog.__table__, "after_create")
+def setup_audit_log_rls(target: Table, connection: Connection, **kw: Any) -> None:
+    """Apply RLS and isolation policy to the 'audit_logs' table immediately after creation."""
+    apply_workspace_rls(target, connection, "audit_log_isolation_policy")
+
 @event.listens_for(Complex.__table__, "after_create")
 def setup_complex_rls(target: Table, connection: Connection, **kw: Any) -> None:
     """Apply RLS and isolation policy to the 'complexes' table immediately after creation."""
@@ -113,3 +123,33 @@ def setup_contact_phone_rls(target: Table, connection: Connection, **kw: Any) ->
 def setup_contact_tag_rls(target: Table, connection: Connection, **kw: Any) -> None:
     """Apply RLS and isolation policy to the 'contact_tags' table immediately after creation."""
     apply_workspace_rls(target, connection, "contact_tag_isolation_policy")
+
+@event.listens_for(CustomFieldDefinition.__table__, "after_create")
+def setup_cfd_rls(target: Table, connection: Connection, **kw: Any) -> None:
+    """Apply RLS and isolation policy to the 'custom_field_definitions' table immediately after creation."""
+    apply_workspace_rls(target, connection, "cfd_isolation_policy")
+
+@event.listens_for(CustomFieldScope.__table__, "after_create")
+def setup_cfs_rls(target: Table, connection: Connection, **kw: Any) -> None:
+    """Apply RLS and isolation policy to the 'custom_field_scopes' table immediately after creation."""
+    apply_workspace_rls(target, connection, "cfs_isolation_policy")
+
+@event.listens_for(Directory.__table__, "after_create")
+def setup_directory_rls(target: Table, connection: Connection, **kw: Any) -> None:
+    """Apply RLS and isolation policy to the 'directories' table immediately after creation."""
+    apply_workspace_rls(target, connection, "directory_isolation_policy")
+
+@event.listens_for(ScopeAccessControl.__table__, "after_create")
+def setup_scope_access_control_rls(target: Table, connection: Connection, **kw: Any) -> None:
+    """Apply RLS and isolation policy to the 'scope_access_controls' table immediately after creation."""
+    apply_workspace_rls(target, connection, "scope_access_control_isolation_policy")
+
+@event.listens_for(Scope.__table__, "after_create")
+def setup_scope_rls(target: Table, connection: Connection, **kw: Any) -> None:
+    """Apply RLS and isolation policy to the 'scopes' table immediately after creation."""
+    apply_workspace_rls(target, connection, "scope_isolation_policy")
+
+@event.listens_for(User.__table__, "after_create")
+def setup_user_rls(target: Table, connection: Connection, **kw: Any) -> None:
+    """Apply RLS and isolation policy to the 'users' table immediately after creation."""
+    apply_workspace_rls(target, connection, "user_isolation_policy")
